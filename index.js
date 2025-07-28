@@ -279,32 +279,26 @@ addon.defineStreamHandler(async ({ type, id }) => {
 // Get the interface once
 const addonInterface = addon.getInterface();
 
+// Cache management function
+const fetchAndCacheInfo = async () => {
+    try {
+        const metas = await getAllInfo();
+        console.log(`${metas.length} channel(s) information cached successfully`);
+    } catch (error) {
+        console.error('Error caching channel information:', error);
+    }
+};
+
 // For local development
 if (!process.env.VERCEL) {
-    // Server setup
-    app.get('/manifest.json', (req, res) => {
-        res.setHeader('Content-Type', 'application/json');
-        res.json(manifest);
-    });
-
-    serveHTTP(addonInterface, { server: app, path: '/manifest.json', port: PORT });
-
-    // Cache management
-    const fetchAndCacheInfo = async () => {
-        try {
-            const metas = await getAllInfo();
-            console.log(`${metas.length} channel(s) information cached successfully`);
-        } catch (error) {
-            console.error('Error caching channel information:', error);
-        }
-    };
-
     // Initial fetch
     fetchAndCacheInfo();
 
     // Schedule fetch based on FETCH_INTERVAL
     setInterval(fetchAndCacheInfo, FETCH_INTERVAL);
 
+    // Use serveHTTP for local development
+    serveHTTP(addonInterface, { port: PORT });
     console.log(`Addon running at http://127.0.0.1:${PORT}`);
 }
 
