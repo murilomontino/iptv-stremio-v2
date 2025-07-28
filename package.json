@@ -2,12 +2,11 @@
   "name": "iptv-stremio-addon",
   "version": "1.0.0",
   "description": "A Stremio add-on that provides access to various IPTV channels using M3U links, leveraging the excellent work of iptv-org.",
-  "main": "dist/index.js",
-  "type": "module",
+  "main": "index.js",
   "scripts": {
-    "dev": "node --watch src/index.js",
+    "dev": "node --watch index.js",
     "build": "vite build",
-    "start": "node dist/index.js",
+    "start": "node index.js",
     "test": "jest",
     "lint": "eslint ."
   },

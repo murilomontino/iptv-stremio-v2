@@ -4,6 +4,7 @@ const axios = require('axios');
 const NodeCache = require('node-cache');
 const { SocksProxyAgent } = require('socks-proxy-agent');
 const { HttpProxyAgent } = require('http-proxy-agent');
+const url = require('url');
 
 // Constants
 const IPTV_CHANNELS_URL = 'https://iptv-org.github.io/api/channels.json';
@@ -275,27 +276,135 @@ addon.defineStreamHandler(async ({ type, id }) => {
     return { streams: [] };
 });
 
-// Server setup
-app.get('/manifest.json', (req, res) => {
-    res.setHeader('Content-Type', 'application/json');
-    res.json(manifest);
-});
+// Get the interface once
+const addonInterface = addon.getInterface();
 
-serveHTTP(addon.getInterface(), { server: app, path: '/manifest.json', port: PORT });
+// For local development
+if (!process.env.VERCEL) {
+    // Server setup
+    app.get('/manifest.json', (req, res) => {
+        res.setHeader('Content-Type', 'application/json');
+        res.json(manifest);
+    });
 
+    serveHTTP(addonInterface, { server: app, path: '/manifest.json', port: PORT });
 
-// Cache management
-const fetchAndCacheInfo = async () => {
-    try {
-        const metas = await getAllInfo();
-        console.log(`${metas.length} channel(s) information cached successfully`);
-    } catch (error) {
-        console.error('Error caching channel information:', error);
+    // Cache management
+    const fetchAndCacheInfo = async () => {
+        try {
+            const metas = await getAllInfo();
+            console.log(`${metas.length} channel(s) information cached successfully`);
+        } catch (error) {
+            console.error('Error caching channel information:', error);
+        }
+    };
+
+    // Initial fetch
+    fetchAndCacheInfo();
+
+    // Schedule fetch based on FETCH_INTERVAL
+    setInterval(fetchAndCacheInfo, FETCH_INTERVAL);
+
+    console.log(`Addon running at http://127.0.0.1:${PORT}`);
+}
+
+// For Vercel (serverless)
+module.exports = async (req, res) => {
+    // Set CORS headers
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Headers', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+
+    // Handle preflight requests
+    if (req.method === 'OPTIONS') {
+        res.statusCode = 200;
+        res.end();
+        return;
     }
+
+    // Parse the URL
+    const parsedUrl = url.parse(req.url, true);
+    const path = parsedUrl.pathname || '/';
+
+    console.log(`Request to: ${path}`);
+
+    // Handle manifest request
+    if (path === '/' || path === '/manifest.json') {
+        res.setHeader('Content-Type', 'application/json');
+        res.statusCode = 200;
+        res.end(JSON.stringify(addonInterface.manifest));
+        return;
+    }
+
+    // Handle catalog request
+    const catalogMatch = path.match(/^\/catalog\/([^\/]+)\/([^\/]+)\.json$/);
+    if (catalogMatch) {
+        const type = catalogMatch[1];
+        const id = catalogMatch[2];
+        const extra = parsedUrl.query || {};
+
+        console.log(`Catalog Request - Type: ${type}, ID: ${id}, Extra:`, extra);
+
+        try {
+            const result = await addonInterface.catalog(type, id, extra);
+            res.setHeader('Content-Type', 'application/json');
+            res.statusCode = 200;
+            res.end(JSON.stringify(result));
+        } catch (error) {
+            console.error('Catalog error:', error);
+            res.setHeader('Content-Type', 'application/json');
+            res.statusCode = 500;
+            res.end(JSON.stringify({ error: error.message || 'Unknown catalog error' }));
+        }
+        return;
+    }
+
+    // Handle stream request
+    const streamMatch = path.match(/^\/stream\/([^\/]+)\/(.+)\.json$/);
+    if (streamMatch) {
+        const type = streamMatch[1];
+        const id = streamMatch[2];
+
+        console.log(`Stream Request - Type: ${type}, ID: ${id}`);
+
+        try {
+            const result = await addonInterface.stream(type, id);
+            res.setHeader('Content-Type', 'application/json');
+            res.statusCode = 200;
+            res.end(JSON.stringify(result));
+        } catch (error) {
+            console.error('Stream error:', error);
+            res.setHeader('Content-Type', 'application/json');
+            res.statusCode = 500;
+            res.end(JSON.stringify({ error: error.message || 'Unknown stream error' }));
+        }
+        return;
+    }
+
+    // Handle meta request
+    const metaMatch = path.match(/^\/meta\/([^\/]+)\/(.+)\.json$/);
+    if (metaMatch) {
+        const type = metaMatch[1];
+        const id = metaMatch[2];
+
+        console.log(`Meta Request - Type: ${type}, ID: ${id}`);
+
+        try {
+            const result = await addonInterface.meta(type, id);
+            res.setHeader('Content-Type', 'application/json');
+            res.statusCode = 200;
+            res.end(JSON.stringify(result));
+        } catch (error) {
+            console.error('Meta error:', error);
+            res.setHeader('Content-Type', 'application/json');
+            res.statusCode = 500;
+            res.end(JSON.stringify({ error: error.message || 'Unknown meta error' }));
+        }
+        return;
+    }
+
+    // If nothing matched, return 404
+    res.setHeader('Content-Type', 'application/json');
+    res.statusCode = 404;
+    res.end(JSON.stringify({ error: 'Not found' }));
 };
-
-// Initial fetch
-fetchAndCacheInfo();
-
-// Schedule fetch based on FETCH_INTERVAL
-setInterval(fetchAndCacheInfo, FETCH_INTERVAL);

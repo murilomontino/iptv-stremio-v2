@@ -9,7 +9,7 @@ export default defineConfig({
     target: 'node18',
     outDir: 'dist',
     lib: {
-      entry: 'src/index.js',
+      entry: 'index.js',
       formats: ['es'],
       fileName: 'index'
     },
