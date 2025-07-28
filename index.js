@@ -36,7 +36,7 @@ const cache = new NodeCache({
 // Addon Manifest
 const manifest = {
     id: 'org.iptv',
-    name: 'IPTV Addon',
+    name: 'IPTV Addon 2',
     version: '0.0.2',
     description: `Watch live TV from ${config.includeCountries.join(', ')}`,
     resources: ['catalog', 'meta', 'stream'],
