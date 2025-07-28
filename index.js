@@ -17,7 +17,7 @@ const FETCH_TIMEOUT = parseInt(process.env.FETCH_TIMEOUT) || 10000; // Fetch tim
 // Configuration for channel filtering.
 const config = {
     includeLanguages: process.env.INCLUDE_LANGUAGES ? process.env.INCLUDE_LANGUAGES.split(',') : [],
-    includeCountries: process.env.INCLUDE_COUNTRIES ? process.env.INCLUDE_COUNTRIES.split(',') : ['GR'],
+    includeCountries: process.env.INCLUDE_COUNTRIES ? process.env.INCLUDE_COUNTRIES.split(',') : ['GR', 'BR'],
     excludeLanguages: process.env.EXCLUDE_LANGUAGES ? process.env.EXCLUDE_LANGUAGES.split(',') : [],
     excludeCountries: process.env.EXCLUDE_COUNTRIES ? process.env.EXCLUDE_COUNTRIES.split(',') : [],
     excludeCategories: process.env.EXCLUDE_CATEGORIES ? process.env.EXCLUDE_CATEGORIES.split(',') : [],
@@ -28,7 +28,10 @@ const app = express();
 app.use(express.json());
 
 // Cache setup
-const cache = new NodeCache({ stdTTL: 0 }); // Set stdTTL to 0 for infinite TTL
+const cache = new NodeCache({ 
+    stdTTL: process.env.VERCEL ? 3600 : 0, // 1 hour TTL for Vercel, infinite for local
+    checkperiod: process.env.VERCEL ? 600 : 0 // Check every 10 minutes on Vercel
+});
 
 // Addon Manifest
 const manifest = {
@@ -322,8 +325,6 @@ module.exports = async (req, res) => {
 
     console.log(`Request to: ${path}`);
 
-    
-
     // Handle manifest request
     if (path === '/' || path === '/manifest.json') {
         res.setHeader('Content-Type', 'application/json');
@@ -342,6 +343,12 @@ module.exports = async (req, res) => {
         console.log(`Catalog Request - Type: ${type}, ID: ${id}, Extra:`, extra);
 
         try {
+            // For Vercel, ensure cache is populated on first request
+            if (process.env.VERCEL && !cache.has('channelsInfo')) {
+                console.log('First request on Vercel - populating cache...');
+                await fetchAndCacheInfo();
+            }
+
             const result = await addonInterface.catalog(type, id, extra);
             res.setHeader('Content-Type', 'application/json');
             res.statusCode = 200;
@@ -364,6 +371,12 @@ module.exports = async (req, res) => {
         console.log(`Stream Request - Type: ${type}, ID: ${id}`);
 
         try {
+            // For Vercel, ensure cache is populated on first request
+            if (process.env.VERCEL && !cache.has('channelsInfo')) {
+                console.log('First request on Vercel - populating cache...');
+                await fetchAndCacheInfo();
+            }
+
             const result = await addonInterface.stream(type, id);
             res.setHeader('Content-Type', 'application/json');
             res.statusCode = 200;
@@ -386,6 +399,12 @@ module.exports = async (req, res) => {
         console.log(`Meta Request - Type: ${type}, ID: ${id}`);
 
         try {
+            // For Vercel, ensure cache is populated on first request
+            if (process.env.VERCEL && !cache.has('channelsInfo')) {
+                console.log('First request on Vercel - populating cache...');
+                await fetchAndCacheInfo();
+            }
+
             const result = await addonInterface.meta(type, id);
             res.setHeader('Content-Type', 'application/json');
             res.statusCode = 200;
