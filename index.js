@@ -322,10 +322,11 @@ module.exports = async (req, res) => {
 
     console.log(`Request to: ${path}`);
 
+    // Handle root path - return addon interface
     if (path === '/') {
         res.setHeader('Content-Type', 'application/json');
         res.statusCode = 200;
-        res.end(addonInterface.get());
+        res.end(JSON.stringify(addonInterface.get()));
         return;
     }
 
